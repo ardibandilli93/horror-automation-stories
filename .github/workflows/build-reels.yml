@@ -1,0 +1,78 @@
+name: Build horror reels
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 9 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Restore processed-story state
+        uses: actions/cache@v4
+        with:
+          path: .automation-state
+          key: processed-stories-${{ github.run_id }}
+          restore-keys: |
+            processed-stories-
+
+      - name: Install FFmpeg and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-liberation
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Render queued stories
+        id: render
+        run: |
+          python scripts/render.py --state .automation-state/processed.json
+          if find output -maxdepth 1 -name '*.mp4' -print -quit 2>/dev/null | grep -q .; then
+            echo "has_output=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_output=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify outputs
+        if: ${{ steps.render.outputs.has_output == 'true' }}
+        run: |
+          for video in output/*.mp4; do
+            ffprobe -v error -show_entries format=duration,size -of json "$video"
+          done
+
+      - name: Upload private YouTube videos
+        if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_YOUTUBE == 'true' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: ${{ vars.YOUTUBE_PRIVACY_STATUS || 'private' }}
+        run: python scripts/upload_youtube.py output
+
+      - name: Send videos to TikTok
+        if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_TIKTOK == 'true' }}
+        env:
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+          TIKTOK_PRIVACY_LEVEL: ${{ vars.TIKTOK_PRIVACY_LEVEL || 'SELF_ONLY' }}
+        run: python scripts/upload_tiktok.py output
+
+      - name: Save rendered videos
+        if: ${{ steps.render.outputs.has_output == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-horror-reels
+          path: output/
+          retention-days: 7
+          if-no-files-found: error
