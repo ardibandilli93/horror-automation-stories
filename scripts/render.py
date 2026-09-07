@@ -89,8 +89,8 @@ def render(story_path, output_dir):
     speech_pitch = story.get("speech_pitch") or "-6Hz"
 
     run([
-        sys.executable, "-m", "edge_tts", "--voice", voice, "--rate", speech_rate,
-        "--volume", speech_volume, "--pitch", speech_pitch,
+        sys.executable, "-m", "edge_tts", "--voice", voice,
+        f"--rate={speech_rate}", f"--volume={speech_volume}", f"--pitch={speech_pitch}",
         "--text", story["narration"],
         "--write-media", narration, "--write-subtitles", subtitles,
     ])
