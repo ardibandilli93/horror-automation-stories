@@ -84,9 +84,11 @@ def render(story_path, output_dir):
     subtitles = work_dir / "captions.vtt"
     output = output_dir / f"{story['id']}.mp4"
     voice = story.get("voice") or "en-GB-SoniaNeural"
+    speech_rate = story.get("speech_rate") or "+12%"
 
     run([
-        sys.executable, "-m", "edge_tts", "--voice", voice, "--rate=+2%", "--text", story["narration"],
+        sys.executable, "-m", "edge_tts", "--voice", voice, "--rate", speech_rate,
+        "--text", story["narration"],
         "--write-media", narration, "--write-subtitles", subtitles,
     ])
 
