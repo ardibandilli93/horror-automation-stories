@@ -108,7 +108,7 @@ def render(story_path, output_dir):
         "eq=brightness=-0.10:saturation=0.75,"
         f"subtitles='{escaped_subtitles}':force_style='FontName=Arial,FontSize=18,"
         "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,"
-        "Outline=3,Shadow=1,Alignment=2,MarginV=210'"
+        "Outline=3,Shadow=1,Alignment=5,MarginL=55,MarginR=55,MarginV=0,WrapStyle=0'"
     )
 
     command = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", background, "-i", narration]
