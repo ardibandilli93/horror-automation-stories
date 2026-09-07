@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import os
-import sys
 from pathlib import Path
 
 import requests
@@ -11,7 +11,11 @@ INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
 
 
 def main():
-    output_dir = Path(sys.argv[1] if len(sys.argv) > 1 else "output")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("output", nargs="?", type=Path, default=Path("output"))
+    parser.add_argument("--state", type=Path)
+    args = parser.parse_args()
+    output_dir = args.output
     token = os.environ.get("TIKTOK_ACCESS_TOKEN", "").strip()
     if not token:
         raise RuntimeError("Missing TIKTOK_ACCESS_TOKEN")
@@ -30,6 +34,7 @@ def main():
                 "disable_comment": False,
                 "disable_stitch": False,
                 "video_cover_timestamp_ms": 1000,
+                "is_aigc": True,
             },
             "source_info": {
                 "source": "FILE_UPLOAD",
@@ -55,6 +60,15 @@ def main():
             )
         upload.raise_for_status()
         print(f"Sent {video_path.name} to TikTok; publish_id={data.get('publish_id')}")
+        if args.state:
+            processed = set()
+            if args.state.exists():
+                processed = set(json.loads(args.state.read_text(encoding="utf-8")))
+            processed.add(metadata["id"])
+            args.state.parent.mkdir(parents=True, exist_ok=True)
+            args.state.write_text(
+                json.dumps(sorted(processed), indent=2) + "\n", encoding="utf-8"
+            )
 
 
 if __name__ == "__main__":
