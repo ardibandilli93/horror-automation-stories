@@ -52,6 +52,7 @@ jobs:
           if [ "${{ vars.ENABLE_AI_GENERATION }}" = "false" ]; then
             python scripts/render.py --queue content/queue --state .automation-state/processed.json --limit 1
           else
+            python scripts/select_daily.py --generated content/generated --backlog content/backlog --processed .automation-state/processed.json --pending .automation-state/pending-generation.json
             python scripts/render.py --queue content/generated --state .automation-state/processed.json
           fi
           if find output -maxdepth 1 -name '*.mp4' -print -quit 2>/dev/null | grep -q .; then
