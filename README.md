@@ -6,14 +6,14 @@ background, optional music, and a TikTok-ready caption.
 
 ## What is automated
 
-1. Read the next unprocessed JSON file in `content/queue/`.
+1. Ask OpenAI for the next Spare Key chapter and four unrelated original stories.
 2. Create narration with Microsoft Edge TTS.
 3. Create timed subtitles from the narration.
 4. Loop and crop a background to 1080 x 1920.
 5. Mix optional background music at low volume.
 6. Export an H.264/AAC MP4.
-7. Direct-post one chapter to TikTok after rendering succeeds.
-8. Mark it processed only after TikTok accepts the upload.
+7. Direct-post all five videos to TikTok after rendering succeeds.
+8. Advance the series chapter only after TikTok accepts the complete batch.
 9. Save the result as a downloadable GitHub Actions artifact.
 
 ## First test
@@ -27,9 +27,12 @@ background, optional music, and a TikTok-ready caption.
 
 The included sample story is ready to render.
 
-The included queue contains **Spare Key — Chapters 3 through 7**. Chapter 3 is
-processed first, then exactly one later chapter is posted on each subsequent
-successful run.
+Automated generation starts at **Spare Key — Chapter 8**, because Chapters 1
+and 2 are already on TikTok. The old Chapters 3 through 7 remain in
+`content/queue/` as a manual archive and are ignored while AI generation is on.
+The package also contains 28 completed standalone stories in `content/backlog/`.
+Four unposted backlog stories are selected per run. After the backlog is empty,
+the four newly generated standalone stories are used automatically.
 
 ## Story format
 
@@ -64,6 +67,12 @@ TikTok Direct Post uses:
 - `TIKTOK_ACCESS_TOKEN`
 - repository variable `ENABLE_TIKTOK=true`
 
+Daily story generation uses:
+
+- secret `OPENAI_API_KEY`
+- optional repository variable `OPENAI_STORY_MODEL=gpt-5-mini`
+- optional repository variable `ENABLE_AI_GENERATION=true`
+
 The TikTok caption always begins `Spare Key — Chapter N`, followed by the
 chapter caption and its ten hashtags. The uploader also declares the rendered
 video as AI-generated content through TikTok's API.
@@ -81,14 +90,14 @@ complete generated video and satisfying TikTok's API rules.
 
 ## Scheduled processing
 
-The workflow runs once daily and can also be started manually. Each run handles
-only the next chapter, starting at Chapter 3. GitHub cron uses UTC, so adjust
-`.github/workflows/build-reels.yml` if you want a different time.
+The workflow runs once daily and can also be started manually. Each successful
+run creates and renders one chapter plus four standalone stories. A failed or
+partially uploaded batch is saved and retried without another OpenAI call or a
+chapter-number jump. GitHub cron uses UTC.
 
-## Next integration
+## Switching back to manual JSON later
 
-The current queue is deliberately file-based so rendering can be verified
-before account credentials are introduced. The next step is a Google Drive
-inbox: the story automation writes JSON there and this project downloads all
-unprocessed files. That requires a Google service-account credential and a
-Drive folder ID.
+Set the repository variable `ENABLE_AI_GENERATION=false`. The workflow will
+stop calling OpenAI and return to processing one file from `content/queue/` per
+run. Set it back to `true` to resume automatic generation at the safely stored
+next chapter number.
