@@ -85,9 +85,12 @@ def render(story_path, output_dir):
     output = output_dir / f"{story['id']}.mp4"
     voice = story.get("voice") or "en-GB-SoniaNeural"
     speech_rate = story.get("speech_rate") or "+12%"
+    speech_volume = story.get("speech_volume") or "-12%"
+    speech_pitch = story.get("speech_pitch") or "-6Hz"
 
     run([
         sys.executable, "-m", "edge_tts", "--voice", voice, "--rate", speech_rate,
+        "--volume", speech_volume, "--pitch", speech_pitch,
         "--text", story["narration"],
         "--write-media", narration, "--write-subtitles", subtitles,
     ])
@@ -144,6 +147,7 @@ def main():
     parser.add_argument("--queue", type=Path, default=ROOT / "content/queue")
     parser.add_argument("--output", type=Path, default=ROOT / "output")
     parser.add_argument("--state", type=Path)
+    parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
     for binary in ("ffmpeg", "ffprobe"):
         require_binary(binary)
@@ -154,18 +158,16 @@ def main():
     processed = set()
     if args.state and args.state.exists():
         processed = set(json.loads(args.state.read_text(encoding="utf-8")))
+    rendered = 0
     for story in stories:
         story_id = json.loads(story.read_text(encoding="utf-8")).get("id")
         if story_id in processed:
             print(f"Skipping previously processed story: {story_id}")
             continue
         render(story, args.output)
-        if args.state:
-            processed.add(story_id)
-            args.state.parent.mkdir(parents=True, exist_ok=True)
-            args.state.write_text(
-                json.dumps(sorted(processed), indent=2) + "\n", encoding="utf-8"
-            )
+        rendered += 1
+        if args.limit and rendered >= args.limit:
+            break
 
 
 if __name__ == "__main__":
