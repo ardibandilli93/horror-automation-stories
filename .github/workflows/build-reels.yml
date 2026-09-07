@@ -38,7 +38,7 @@ jobs:
       - name: Render queued stories
         id: render
         run: |
-          python scripts/render.py --state .automation-state/processed.json
+          python scripts/render.py --state .automation-state/processed.json --limit 1
           if find output -maxdepth 1 -name '*.mp4' -print -quit 2>/dev/null | grep -q .; then
             echo "has_output=true" >> "$GITHUB_OUTPUT"
           else
@@ -52,21 +52,12 @@ jobs:
             ffprobe -v error -show_entries format=duration,size -of json "$video"
           done
 
-      - name: Upload private YouTube videos
-        if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_YOUTUBE == 'true' }}
-        env:
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          YOUTUBE_PRIVACY_STATUS: ${{ vars.YOUTUBE_PRIVACY_STATUS || 'private' }}
-        run: python scripts/upload_youtube.py output
-
       - name: Send videos to TikTok
         if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_TIKTOK == 'true' }}
         env:
           TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
           TIKTOK_PRIVACY_LEVEL: ${{ vars.TIKTOK_PRIVACY_LEVEL || 'SELF_ONLY' }}
-        run: python scripts/upload_tiktok.py output
+        run: python scripts/upload_tiktok.py output --state .automation-state/processed.json
 
       - name: Save rendered videos
         if: ${{ steps.render.outputs.has_output == 'true' }}
