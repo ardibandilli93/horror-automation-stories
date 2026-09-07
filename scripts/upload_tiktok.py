@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import tempfile
 from pathlib import Path
 
 import requests
@@ -14,6 +15,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", type=Path, default=Path("output"))
     parser.add_argument("--state", type=Path)
+    parser.add_argument("--generation-state", type=Path)
+    parser.add_argument("--pending-generation", type=Path)
     args = parser.parse_args()
     output_dir = args.output
     token = os.environ.get("TIKTOK_ACCESS_TOKEN", "").strip()
@@ -69,6 +72,22 @@ def main():
             args.state.write_text(
                 json.dumps(sorted(processed), indent=2) + "\n", encoding="utf-8"
             )
+
+    if args.generation_state and args.pending_generation and args.pending_generation.exists():
+        pending = json.loads(args.pending_generation.read_text(encoding="utf-8"))
+        processed = set(json.loads(args.state.read_text(encoding="utf-8"))) if args.state.exists() else set()
+        required = set(pending.get("generated_ids", []))
+        if required and required.issubset(processed):
+            args.generation_state.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=args.generation_state.parent, delete=False
+            ) as handle:
+                json.dump(pending["next_state"], handle, indent=2, ensure_ascii=False)
+                handle.write("\n")
+                temporary = Path(handle.name)
+            temporary.replace(args.generation_state)
+            args.pending_generation.unlink()
+            print(f"Advanced series state to Chapter {pending['next_state']['next_chapter']}")
 
 
 if __name__ == "__main__":
