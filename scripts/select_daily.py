@@ -4,6 +4,7 @@ from pathlib import Path
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--generated",type=Path,required=True); p.add_argument("--backlog",type=Path,required=True); p.add_argument("--processed",type=Path,required=True); p.add_argument("--pending",type=Path,required=True); a=p.parse_args()
+    a.generated.mkdir(parents=True, exist_ok=True)
     processed=set(json.loads(a.processed.read_text())) if a.processed.exists() else set()
     available=[]
     for path in sorted(a.backlog.glob("*.json")):

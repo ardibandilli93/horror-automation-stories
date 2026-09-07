@@ -89,6 +89,8 @@ Prior standalone premise-and-twist summaries to avoid:
 
 def parse_response(text):
     value = text.strip()
+    if not value:
+        raise ValueError("OpenAI returned an empty response")
     if value.startswith("```"):
         value = re.sub(r"^```(?:json)?\s*", "", value)
         value = re.sub(r"\s*```$", "", value)
@@ -158,12 +160,34 @@ def main():
         print(f"Restored pending batch with {len(pending['stories'])} stories; no API call made")
         return
 
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("Missing OPENAI_API_KEY GitHub Actions secret")
     bible = load_json(ROOT / "content/series/spare-key-bible.json")
     state = load_json(args.state, {}) or {}
     chapter_number = int(state.get("next_chapter", bible["next_chapter"]))
+    queued_chapter = ROOT / "content/queue" / f"chapter-{chapter_number:03d}.json"
+
+    # Chapters 3-7 were already written and approved in the conversation. Use
+    # those exact scripts before asking OpenAI to continue the series at 8.
+    if queued_chapter.exists():
+        chapter_story = load_json(queued_chapter)
+        next_state = {
+            "next_chapter": chapter_number + 1,
+            "chapter_notes": state.get("chapter_notes", []),
+            "standalone_titles": state.get("standalone_titles", []),
+            "standalone_premises": state.get("standalone_premises", []),
+        }
+        pending_value = {
+            "generated_ids": [chapter_story["id"]],
+            "stories": [chapter_story],
+            "next_state": next_state,
+        }
+        atomic_json(args.pending, pending_value)
+        write_outputs(args.output, [chapter_story])
+        print(f"Selected existing Spare Key Chapter {chapter_number}; no OpenAI call made")
+        return
+
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("Missing OPENAI_API_KEY GitHub Actions secret")
     model = os.environ.get("OPENAI_STORY_MODEL", "gpt-5-mini").strip()
     date_slug = datetime.now(timezone.utc).date().isoformat()
     client = OpenAI(api_key=api_key)
@@ -180,8 +204,21 @@ Correct only those problems while preserving quality. Return the complete correc
 Previous output:
 {raw_output}
 """
-        response = client.responses.create(model=model, input=request, max_output_tokens=5000)
+        response = client.responses.create(
+            model=model,
+            input=request,
+            max_output_tokens=8000,
+            reasoning={"effort": "low"},
+            text={"format": {"type": "json_object"}},
+        )
         raw_output = response.output_text
+        if not raw_output.strip():
+            status = getattr(response, "status", "unknown")
+            incomplete = getattr(response, "incomplete_details", None)
+            raise RuntimeError(
+                f"OpenAI returned no story text (status={status}, incomplete_details={incomplete}). "
+                "Check API billing/model access or try OPENAI_STORY_MODEL=gpt-4.1-mini."
+            )
         try:
             package = parse_response(raw_output)
             stories = build_stories(package, chapter_number, date_slug)
