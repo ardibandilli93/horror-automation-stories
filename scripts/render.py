@@ -22,6 +22,8 @@ def require_binary(name):
 
 
 def media_files(directory, extensions):
+    if not directory.exists():
+        return []
     return sorted(
         path for path in directory.iterdir()
         if path.is_file() and path.suffix.lower() in extensions
