@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -81,19 +83,30 @@ def render(story_path, output_dir):
     work_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     narration = work_dir / "narration.mp3"
-    subtitles = work_dir / "captions.vtt"
+    subtitles = work_dir / "captions-centered.srt"
+    ass_subtitles = work_dir / "captions-centered.ass"
     output = output_dir / f"{story['id']}.mp4"
-    voice = story.get("voice") or "en-GB-SoniaNeural"
-    speech_rate = story.get("speech_rate") or "+12%"
-    speech_volume = story.get("speech_volume") or "-12%"
-    speech_pitch = story.get("speech_pitch") or "-6Hz"
+    voice = os.environ.get("NARRATION_VOICE", "en-GB-RyanNeural")
+    speech_rate = os.environ.get("NARRATION_RATE", "+6%")
+    speech_volume = os.environ.get("NARRATION_VOLUME", "-18%")
+    speech_pitch = os.environ.get("NARRATION_PITCH", "-10Hz")
 
     run([
-        sys.executable, "-m", "edge_tts", "--voice", voice,
-        f"--rate={speech_rate}", f"--volume={speech_volume}", f"--pitch={speech_pitch}",
-        "--text", story["narration"],
-        "--write-media", narration, "--write-subtitles", subtitles,
+        sys.executable, ROOT / "scripts/synthesize_whisper.py",
+        "--voice", voice, f"--rate={speech_rate}", f"--volume={speech_volume}",
+        f"--pitch={speech_pitch}", "--text", story["narration"],
+        "--audio", narration, "--subtitles", subtitles,
     ])
+
+    run(["ffmpeg", "-y", "-i", subtitles, ass_subtitles])
+    ass_text = ass_subtitles.read_text(encoding="utf-8")
+    centered_style = (
+        "Style: Default,Arial,18,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,"
+        "-1,0,0,0,100,100,0,0,1,3,1,5,55,55,0,1"
+    )
+    ass_text = re.sub(r"(?m)^Style: Default,.*$", centered_style, ass_text)
+    ass_text = re.sub(r"\\{\\(?:an|pos|move)[^}]*\\}", "", ass_text)
+    ass_subtitles.write_text(ass_text, encoding="utf-8")
 
     duration = duration_seconds(narration) + 0.35
     if duration > 60:
@@ -101,14 +114,14 @@ def render(story_path, output_dir):
             f"{story_path}: generated narration is {duration:.1f}s; shorten it below 60s"
         )
 
-    escaped_subtitles = str(subtitles).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+    escaped_subtitles = str(ass_subtitles).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
     video_filter = (
         "scale=1080:1920:force_original_aspect_ratio=increase,"
         "crop=1080:1920,"
         "eq=brightness=-0.10:saturation=0.75,"
         f"subtitles='{escaped_subtitles}':force_style='FontName=Arial,FontSize=18,"
         "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,"
-        "Outline=3,Shadow=1,Alignment=2,MarginV=210'"
+        "Outline=3,Shadow=1,Alignment=5,MarginL=55,MarginR=55,MarginV=0,WrapStyle=0'"
     )
 
     command = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", background, "-i", narration]
