@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TikTok connection — Spare Key Stories</title>
+  <style>body{font:17px/1.6 system-ui,sans-serif;max-width:720px;margin:60px auto;padding:0 24px;color:#222}code{display:block;padding:14px;background:#f3f3f5;overflow-wrap:anywhere}button{padding:10px 16px;font:inherit;cursor:pointer}.error{color:#a40000}</style>
+</head>
+<body>
+  <h1 id="heading">Connecting TikTok…</h1>
+  <p id="message">Checking the authorisation response.</p>
+  <code id="code" hidden></code>
+  <p><button id="copy" hidden>Copy authorisation code</button></p>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const code = params.get('code');
+    const error = params.get('error') || params.get('error_description');
+    const heading = document.getElementById('heading');
+    const message = document.getElementById('message');
+    const codeBox = document.getElementById('code');
+    const copy = document.getElementById('copy');
+    if (code) {
+      heading.textContent = 'TikTok authorised';
+      message.textContent = 'Copy this short-lived code and use it only in the secure token setup step.';
+      codeBox.textContent = code;
+      codeBox.hidden = false;
+      copy.hidden = false;
+      copy.onclick = async () => {
+        await navigator.clipboard.writeText(code);
+        copy.textContent = 'Copied';
+      };
+    } else {
+      heading.textContent = 'TikTok authorisation was not completed';
+      message.textContent = error || 'No authorisation code was returned.';
+      message.className = 'error';
+    }
+  </script>
+</body>
+</html>
