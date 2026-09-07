@@ -83,6 +83,7 @@ def render(story_path, output_dir):
     work_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     narration = work_dir / "narration.mp3"
+    softened_narration = work_dir / "narration-soft.mp3"
     subtitles = work_dir / "captions-centered.srt"
     ass_subtitles = work_dir / "captions-centered.ass"
     output = output_dir / f"{story['id']}.mp4"
@@ -98,6 +99,15 @@ def render(story_path, output_dir):
         "--audio", narration, "--subtitles", subtitles,
     ])
 
+    # Create a quieter, intimate horror-narration sound even when the free
+    # Edge endpoint does not permit Ryan's Azure-only whisper style.
+    run([
+        "ffmpeg", "-y", "-i", narration, "-af",
+        "highpass=f=90,lowpass=f=6500,equalizer=f=2800:t=q:w=1.2:g=3,"
+        "acompressor=threshold=0.08:ratio=2:attack=20:release=250,volume=0.78",
+        "-c:a", "libmp3lame", "-b:a", "192k", softened_narration,
+    ])
+
     run(["ffmpeg", "-y", "-i", subtitles, ass_subtitles])
     ass_text = ass_subtitles.read_text(encoding="utf-8")
     centered_style = (
@@ -108,7 +118,7 @@ def render(story_path, output_dir):
     ass_text = re.sub(r"\\{\\(?:an|pos|move)[^}]*\\}", "", ass_text)
     ass_subtitles.write_text(ass_text, encoding="utf-8")
 
-    duration = duration_seconds(narration) + 0.35
+    duration = duration_seconds(softened_narration) + 0.35
     if duration > 60:
         raise ValueError(
             f"{story_path}: generated narration is {duration:.1f}s; shorten it below 60s"
@@ -124,7 +134,7 @@ def render(story_path, output_dir):
         "Outline=3,Shadow=1,Alignment=5,MarginL=55,MarginR=55,MarginV=0,WrapStyle=0'"
     )
 
-    command = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", background, "-i", narration]
+    command = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", background, "-i", softened_narration]
     if music:
         command += ["-stream_loop", "-1", "-i", music]
         command += [

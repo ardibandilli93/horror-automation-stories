@@ -6,6 +6,8 @@ from pathlib import Path
 import edge_tts
 import edge_tts.communicate as communicate_module
 
+STANDARD_SSML = communicate_module.mkssml
+
 
 def whisper_ssml(config, escaped_text):
     if isinstance(escaped_text, bytes):
@@ -20,8 +22,8 @@ def whisper_ssml(config, escaped_text):
     )
 
 
-async def synthesize(args):
-    communicate_module.mkssml = whisper_ssml
+async def synthesize_once(args, use_whisper):
+    communicate_module.mkssml = whisper_ssml if use_whisper else STANDARD_SSML
     speaker = edge_tts.Communicate(
         args.text, args.voice, rate=args.rate, volume=args.volume,
         pitch=args.pitch, boundary="SentenceBoundary"
@@ -34,6 +36,16 @@ async def synthesize(args):
             elif item["type"] in ("WordBoundary", "SentenceBoundary"):
                 subtitles.feed(item)
     Path(args.subtitles).write_text(subtitles.get_srt(), encoding="utf-8")
+
+
+async def synthesize(args):
+    try:
+        await synthesize_once(args, True)
+    except Exception as error:
+        print(f"Whisper style unavailable; using soft Ryan fallback: {error}")
+        Path(args.audio).unlink(missing_ok=True)
+        Path(args.subtitles).unlink(missing_ok=True)
+        await synthesize_once(args, False)
 
 
 def main():
