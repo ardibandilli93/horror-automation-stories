@@ -38,6 +38,7 @@ Add one file per video to `content/queue/`:
   "narration": "Narration only, ideally 130 to 155 words.",
   "description": "Short caption followed by hashtags.",
   "voice": "en-GB-SoniaNeural",
+  "speech_rate": "+12%",
   "background": "",
   "music": ""
 }
@@ -45,7 +46,8 @@ Add one file per video to `content/queue/`:
 
 Leaving `background` or `music` empty selects a file automatically. Music is
 optional. The renderer refuses narration over 175 words or videos over 60
-seconds.
+seconds. `speech_rate` can be adjusted per story; `+12%` is the default chosen
+to keep 130-155 word narration below one minute.
 
 ## Repository secrets
 
