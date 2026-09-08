@@ -35,6 +35,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Test caption layout and renderer
+        run: python -m unittest discover -s scripts -p test_rendering.py -v
+
       - name: Generate Chapter 8 and four standalone stories
         if: ${{ vars.ENABLE_AI_GENERATION != 'false' }}
         env:
@@ -48,6 +51,14 @@ jobs:
 
       - name: Render today's stories
         id: render
+        env:
+          NARRATION_BACKEND: ${{ vars.NARRATION_BACKEND || 'edge' }}
+          NARRATION_VOICE: ${{ vars.NARRATION_VOICE || 'en-GB-RyanNeural' }}
+          NARRATION_RATE: ${{ vars.NARRATION_RATE || '-10%' }}
+          NARRATION_VOLUME: ${{ vars.NARRATION_VOLUME || '-18%' }}
+          NARRATION_PITCH: ${{ vars.NARRATION_PITCH || '-10Hz' }}
+          OPENAI_TTS_VOICE: ${{ vars.OPENAI_TTS_VOICE || 'onyx' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           if [ "${{ vars.ENABLE_AI_GENERATION }}" = "false" ]; then
             python scripts/render.py --queue content/queue --state .automation-state/processed.json --limit 1
@@ -80,10 +91,20 @@ jobs:
             --pending-generation .automation-state/pending-generation.json
 
       - name: Save rendered videos
-        if: ${{ steps.render.outputs.has_output == 'true' }}
+        if: ${{ always() && steps.render.outputs.has_output == 'true' }}
+        id: videos
         uses: actions/upload-artifact@v4
         with:
           name: rendered-horror-reels
           path: output/
-          retention-days: 7
+          retention-days: 14
           if-no-files-found: error
+
+      - name: Show video download link
+        if: ${{ always() && steps.videos.outcome == 'success' }}
+        env:
+          ARTIFACT_URL: ${{ steps.videos.outputs.artifact-url }}
+        run: |
+          echo "### Download your videos" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Download rendered-horror-reels ZIP]($ARTIFACT_URL)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Unzip the download on your computer. Videos are saved even when TikTok is disabled." >> "$GITHUB_STEP_SUMMARY"
