@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import random
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from captions import write_centered_ass
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,37 +83,56 @@ def render(story_path, output_dir):
     work_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     narration = work_dir / "narration.mp3"
-    subtitles = work_dir / "captions.vtt"
+    softened_narration = work_dir / "narration-soft.mp3"
+    subtitles = work_dir / "captions-centered.srt"
+    ass_subtitles = work_dir / "captions-centered.ass"
     output = output_dir / f"{story['id']}.mp4"
-    voice = story.get("voice") or "en-GB-SoniaNeural"
-    speech_rate = story.get("speech_rate") or "+12%"
-    speech_volume = story.get("speech_volume") or "-12%"
-    speech_pitch = story.get("speech_pitch") or "-6Hz"
+    voice = os.environ.get("NARRATION_VOICE", "en-GB-RyanNeural")
+    speech_rate = os.environ.get("NARRATION_RATE", "-10%")
+    speech_volume = os.environ.get("NARRATION_VOLUME", "-18%")
+    speech_pitch = os.environ.get("NARRATION_PITCH", "-10Hz")
 
     run([
-        sys.executable, "-m", "edge_tts", "--voice", voice,
-        f"--rate={speech_rate}", f"--volume={speech_volume}", f"--pitch={speech_pitch}",
-        "--text", story["narration"],
-        "--write-media", narration, "--write-subtitles", subtitles,
+        sys.executable, ROOT / "scripts/synthesize_whisper.py",
+        "--voice", voice, f"--rate={speech_rate}", f"--volume={speech_volume}",
+        f"--pitch={speech_pitch}", "--text", story["narration"],
+        "--audio", narration, "--subtitles", subtitles,
     ])
 
-    duration = duration_seconds(narration) + 0.35
+    raw_duration = duration_seconds(narration)
+    if raw_duration <= 0:
+        raise ValueError("Narration has no audio duration")
+    timing_scale = min(1.0, 58.5 / raw_duration)
+    tempo = 1.0 / timing_scale
+    print(f"Narration: {voice}, rate={speech_rate}; duration={raw_duration:.2f}s; fit speed={tempo:.3f}x")
+    if tempo > 1.2:
+        raise ValueError("Narration needs more than 20% acceleration to fit 60s. Shorten the story to preserve slow delivery.")
+
+    # Quieter mix; this is sound processing, not a conversion into whispering.
+    run([
+        "ffmpeg", "-y", "-i", narration, "-af",
+        f"atempo={tempo:.6f},highpass=f=90,lowpass=f=6500,equalizer=f=2800:t=q:w=1.2:g=3,"
+        "acompressor=threshold=0.08:ratio=2:attack=20:release=250,volume=0.78",
+        "-c:a", "libmp3lame", "-b:a", "192k", softened_narration,
+    ])
+
+    write_centered_ass(subtitles, ass_subtitles, timing_scale)
+
+    duration = duration_seconds(softened_narration) + 0.35
     if duration > 60:
         raise ValueError(
             f"{story_path}: generated narration is {duration:.1f}s; shorten it below 60s"
         )
 
-    escaped_subtitles = str(subtitles).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+    escaped_subtitles = str(ass_subtitles).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
     video_filter = (
         "scale=1080:1920:force_original_aspect_ratio=increase,"
-        "crop=1080:1920,"
+        "crop=1080:1920,setsar=1,"
         "eq=brightness=-0.10:saturation=0.75,"
-        f"subtitles='{escaped_subtitles}':force_style='FontName=Arial,FontSize=18,"
-        "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,"
-        "Outline=3,Shadow=1,Alignment=2,MarginV=210'"
+        f"ass='{escaped_subtitles}'"
     )
 
-    command = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", background, "-i", narration]
+    command = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", background, "-i", softened_narration]
     if music:
         command += ["-stream_loop", "-1", "-i", music]
         command += [
@@ -135,6 +156,11 @@ def render(story_path, output_dir):
         "description": story["description"],
         "duration_seconds": round(duration_seconds(output), 2),
         "video": output.name,
+        "renderer_version": "centered-v2",
+        "narration_backend": os.environ.get("NARRATION_BACKEND", "edge"),
+        "voice": os.environ.get("OPENAI_TTS_VOICE", "onyx") if os.environ.get("NARRATION_BACKEND") == "openai" else voice,
+        "fit_speed": round(tempo, 4),
+        "caption_position": [540, 960],
     }
     (output_dir / f"{story['id']}.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
