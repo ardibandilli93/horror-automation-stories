@@ -3,37 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TikTok connection — Spare Key Stories</title>
-  <style>body{font:17px/1.6 system-ui,sans-serif;max-width:720px;margin:60px auto;padding:0 24px;color:#222}code{display:block;padding:14px;background:#f3f3f5;overflow-wrap:anywhere}button{padding:10px 16px;font:inherit;cursor:pointer}.error{color:#a40000}</style>
+  <title>hereforanxiety</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1 id="heading">Connecting TikTok…</h1>
-  <p id="message">Checking the authorisation response.</p>
-  <code id="code" hidden></code>
-  <p><button id="copy" hidden>Copy authorisation code</button></p>
+  <header><img class="logo" src="icon.png" alt="hereforanxiety app icon"><div><h1 class="brand">hereforanxiety</h1><p class="tagline">TikTok authorisation</p><nav><a href="index.html">Home</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></nav></div></header>
+  <main><section><h2 id="heading">Checking authorisation…</h2><p id="message">Please wait while hereforanxiety checks TikTok's response.</p><p id="code-wrap" hidden><strong>Short-lived authorisation code:</strong><br><code id="code"></code></p><button id="copy" hidden>Copy code</button></section></main>
+  <footer>© 2026 hereforanxiety</footer>
   <script>
-    const params = new URLSearchParams(location.search);
-    const code = params.get('code');
-    const error = params.get('error') || params.get('error_description');
-    const heading = document.getElementById('heading');
-    const message = document.getElementById('message');
-    const codeBox = document.getElementById('code');
-    const copy = document.getElementById('copy');
-    if (code) {
-      heading.textContent = 'TikTok authorised';
-      message.textContent = 'Copy this short-lived code and use it only in the secure token setup step.';
-      codeBox.textContent = code;
-      codeBox.hidden = false;
-      copy.hidden = false;
-      copy.onclick = async () => {
-        await navigator.clipboard.writeText(code);
-        copy.textContent = 'Copied';
-      };
-    } else {
-      heading.textContent = 'TikTok authorisation was not completed';
-      message.textContent = error || 'No authorisation code was returned.';
-      message.className = 'error';
-    }
+    const params=new URLSearchParams(location.search),code=params.get('code'),error=params.get('error_description')||params.get('error');
+    const heading=document.getElementById('heading'),message=document.getElementById('message'),wrap=document.getElementById('code-wrap'),box=document.getElementById('code'),copy=document.getElementById('copy');
+    if(code){heading.textContent='TikTok authorisation completed';message.textContent='Use this code only in the secure token setup step. Do not publish or share it.';box.textContent=code;wrap.hidden=false;copy.hidden=false;copy.onclick=async()=>{await navigator.clipboard.writeText(code);copy.textContent='Copied';};}
+    else{heading.textContent='TikTok authorisation was not completed';message.textContent=error||'No authorisation code was returned.';}
   </script>
 </body>
 </html>
