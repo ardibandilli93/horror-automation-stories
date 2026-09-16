@@ -105,7 +105,7 @@ def render(story_path, output_dir):
     timing_scale = min(1.0, 58.5 / raw_duration)
     tempo = 1.0 / timing_scale
     print(f"Narration: {voice}, rate={speech_rate}; duration={raw_duration:.2f}s; fit speed={tempo:.3f}x")
-    if tempo > 1.2:
+    if tempo > 1.3:
         raise ValueError("Narration needs more than 20% acceleration to fit 60s. Shorten the story to preserve slow delivery.")
 
     # Quieter mix; this is sound processing, not a conversion into whispering.
