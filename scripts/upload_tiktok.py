@@ -13,7 +13,7 @@ TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
 CREATOR_INFO_URL = "https://open.tiktokapis.com/v2/post/publish/creator_info/query/"
 INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
 STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
-
+DRAFT_UPLOAD_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/"
 
 def api_data(response, operation):
     try:
