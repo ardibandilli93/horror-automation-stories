@@ -16,15 +16,12 @@ STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
 
 
 def api_data(response, operation):
-    try:
-        payload = response.json()
-    except ValueError:
-        payload = {}
+    response.raise_for_status()
+    payload = response.json()
     error = payload.get("error", {})
-    if not response.ok or (error and error.get("code") not in (None, "ok")):
+    if error and error.get("code") not in (None, "ok"):
         raise RuntimeError(
-            f"TikTok {operation} failed (HTTP {response.status_code}): "
-            f"{error.get('code', 'unknown')}: {error.get('message', response.text[:500])} "
+            f"TikTok {operation} failed: {error.get('code')}: {error.get('message', '')} "
             f"(log_id={error.get('log_id', 'unknown')})"
         )
     return payload.get("data", {})
@@ -178,8 +175,6 @@ def main():
                 "disable_comment": bool(creator.get("comment_disabled", False)),
                 "disable_stitch": bool(creator.get("stitch_disabled", False)),
                 "video_cover_timestamp_ms": 1000,
-                "brand_content_toggle": False,
-                "brand_organic_toggle": False,
                 "is_aigc": True,
             },
             "source_info": {
