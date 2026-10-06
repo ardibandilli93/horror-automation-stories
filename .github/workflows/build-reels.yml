@@ -91,7 +91,7 @@ jobs:
           TIKTOK_STATUS_TIMEOUT_SECONDS: ${{ vars.TIKTOK_STATUS_TIMEOUT_SECONDS || '300' }}
           TIKTOK_UPLOAD_LIMIT: ${{ vars.TIKTOK_UPLOAD_LIMIT || '0' }}
         run: |
-          python scripts/upload_tiktok.py output \
+          python scripts/upload_tiktok_draft.py output \
             --state .automation-state/processed.json \
             --generation-state .automation-state/generation.json \
             --pending-generation .automation-state/pending-generation.json
