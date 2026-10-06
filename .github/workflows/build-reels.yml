@@ -82,8 +82,13 @@ jobs:
       - name: Send videos to TikTok
         if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_TIKTOK == 'true' }}
         env:
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_REFRESH_TOKEN: ${{ secrets.TIKTOK_REFRESH_TOKEN }}
           TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
           TIKTOK_PRIVACY_LEVEL: ${{ vars.TIKTOK_PRIVACY_LEVEL || 'SELF_ONLY' }}
+          TIKTOK_STATUS_TIMEOUT_SECONDS: ${{ vars.TIKTOK_STATUS_TIMEOUT_SECONDS || '300' }}
+          TIKTOK_UPLOAD_LIMIT: ${{ vars.TIKTOK_UPLOAD_LIMIT || '0' }}
         run: |
           python scripts/upload_tiktok.py output \
             --state .automation-state/processed.json \
