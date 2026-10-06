@@ -105,8 +105,10 @@ def creator_info(token, privacy):
     return data
 
 
-def wait_for_publish(token, publish_id, success_status):
+def wait_for_publish(token, publish_id, success_status, allow_pending=False):
     timeout = int(os.environ.get("TIKTOK_STATUS_TIMEOUT_SECONDS", "300"))
+    if allow_pending:
+        timeout = min(timeout, 60)
     deadline = time.monotonic() + timeout
     last_status = "unknown"
     while time.monotonic() < deadline:
@@ -119,16 +121,22 @@ def wait_for_publish(token, publish_id, success_status):
         data = api_data(response, "status query")
         last_status = data.get("status", "unknown")
         print(f"TikTok publish status for {publish_id}: {last_status}")
-        if last_status == success_status:
-            return
+        if last_status in {success_status, "PUBLISH_COMPLETE", "SEND_TO_USER_INBOX"}:
+            return last_status
         if last_status == "FAILED":
             raise RuntimeError(
                 f"TikTok rejected {publish_id}: {data.get('fail_reason', 'unknown reason')}"
             )
         time.sleep(5)
+    if allow_pending and last_status in {"PROCESSING_UPLOAD", "PROCESSING_DOWNLOAD"}:
+        print(
+            f"::warning::TikTok accepted {publish_id}, but it is still {last_status} "
+            f"after {timeout}s. Treating the accepted draft as pending so it is not uploaded twice."
+        )
+        return last_status
     raise TimeoutError(
         f"TikTok did not finish processing {publish_id} within {timeout}s; "
-        f"last status={last_status}. The story was not marked processed."
+        f"last status={last_status}."
     )
 
 
@@ -237,9 +245,20 @@ def main():
             )
         upload.raise_for_status()
         print(f"Uploaded {video_path.name}; publish_id={publish_id}")
-        wait_for_publish(token, publish_id, success_status)
+        final_status = wait_for_publish(
+            token,
+            publish_id,
+            success_status,
+            allow_pending=(post_mode == "draft"),
+        )
         if post_mode == "draft":
-            print(f"Delivered {video_path.name} to the TikTok inbox successfully")
+            if final_status in {"PROCESSING_UPLOAD", "PROCESSING_DOWNLOAD"}:
+                print(
+                    f"TikTok accepted {video_path.name}; processing continues on TikTok "
+                    "and the workflow will not resend it."
+                )
+            else:
+                print(f"Delivered {video_path.name} to the TikTok inbox successfully")
             add_draft_caption_to_summary(metadata)
         else:
             print(f"Published {video_path.name} successfully")
