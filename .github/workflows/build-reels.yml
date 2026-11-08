@@ -6,7 +6,7 @@ on:
     - cron: "15 9 * * *"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   render:
@@ -80,7 +80,7 @@ jobs:
           done
 
       - name: Send videos to TikTok
-        if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_TIKTOK == 'true' }}
+        if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_TIKTOK == 'true' && vars.ENABLE_BUFFER != 'true' }}
         env:
           TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
@@ -94,6 +94,32 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python scripts/upload_tiktok_draft.py output \
+            --state .automation-state/processed.json \
+            --generation-state .automation-state/generation.json \
+            --pending-generation .automation-state/pending-generation.json
+
+      - name: Publish temporary media for Buffer
+        if: ${{ steps.render.outputs.has_output == 'true' && vars.ENABLE_BUFFER == 'true' }}
+        id: buffer_media
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_TAG="buffer-media-${GITHUB_RUN_ID}"
+          gh release create "$RELEASE_TAG" output/*.mp4 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Temporary Buffer media ${GITHUB_RUN_ID}" \
+            --notes "Temporary public video files used by Buffer. Safe to remove after every scheduled post is published."
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Schedule videos with Buffer
+        if: ${{ steps.buffer_media.outcome == 'success' }}
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          BUFFER_TIKTOK_CHANNEL: ${{ vars.BUFFER_TIKTOK_CHANNEL || 'hereforanxiety' }}
+          BUFFER_TIMEZONE: ${{ vars.BUFFER_TIMEZONE || 'Europe/London' }}
+        run: |
+          python scripts/schedule_buffer.py output \
+            --release-tag "${{ steps.buffer_media.outputs.release_tag }}" \
             --state .automation-state/processed.json \
             --generation-state .automation-state/generation.json \
             --pending-generation .automation-state/pending-generation.json
