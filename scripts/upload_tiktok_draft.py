@@ -151,6 +151,33 @@ def mark_processed(state_path, story_id):
     )
 
 
+def send_caption_to_telegram(metadata):
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token and not chat_id:
+        return
+    if not token or not chat_id:
+        print("::warning::Configure both TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to receive captions")
+        return
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={
+                "chat_id": chat_id,
+                "text": metadata["description"].strip(),
+                "disable_web_page_preview": True,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not payload.get("ok"):
+            raise RuntimeError(payload.get("description", "unknown Telegram error"))
+        print(f"Sent the ready-to-copy caption to Telegram for {metadata['title']}")
+    except Exception as error:
+        print(f"::warning::TikTok received the video, but Telegram caption delivery failed: {error}")
+
+
 def add_draft_caption_to_summary(metadata):
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "").strip()
     if not summary_path:
@@ -260,6 +287,7 @@ def main():
             else:
                 print(f"Delivered {video_path.name} to the TikTok inbox successfully")
             add_draft_caption_to_summary(metadata)
+            send_caption_to_telegram(metadata)
         else:
             print(f"Published {video_path.name} successfully")
         if args.state:
