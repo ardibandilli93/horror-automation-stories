@@ -67,6 +67,16 @@ TikTok Direct Post uses:
 - `TIKTOK_ACCESS_TOKEN`
 - repository variable `ENABLE_TIKTOK=true`
 
+Optional phone caption delivery for TikTok drafts uses:
+
+- secret `TELEGRAM_BOT_TOKEN`
+- secret `TELEGRAM_CHAT_ID`
+
+When both Telegram secrets are configured, every successfully delivered TikTok
+draft sends its exact title, description and hashtags to your Telegram chat as
+one ready-to-copy message. Telegram delivery failures do not cause duplicate
+TikTok uploads.
+
 Daily story generation uses:
 
 - secret `OPENAI_API_KEY`
