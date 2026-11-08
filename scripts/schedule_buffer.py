@@ -43,15 +43,16 @@ def find_tiktok_channel(token, requested_name):
     )
     organizations = account.get("account", {}).get("organizations", [])
     matches = []
-    query = """
-    query GetChannels($organizationId: OrganizationId!) {
-      channels(input: {organizationId: $organizationId}) {
-        id name displayName service
-      }
-    }
-    """
     for organization in organizations:
-        data = graphql(token, query, {"organizationId": organization["id"]})
+        organization_id = json.dumps(str(organization["id"]))
+        query = f"""
+        query GetChannels {{
+          channels(input: {{organizationId: {organization_id}}}) {{
+            id name displayName service
+          }}
+        }}
+        """
+        data = graphql(token, query)
         for channel in data.get("channels", []):
             if str(channel.get("service", "")).lower() == "tiktok":
                 matches.append(channel)
