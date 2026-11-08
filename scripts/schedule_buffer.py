@@ -83,13 +83,6 @@ def parse_clock(value):
     return time(hour=hour, minute=minute)
 
 
-def next_slot(clock, zone, after):
-    candidate = datetime.combine(after.date(), parse_clock(clock), tzinfo=zone)
-    if candidate <= after + timedelta(minutes=20):
-        candidate += timedelta(days=1)
-    return candidate
-
-
 def schedule_times(stories, zone_name):
     zone = ZoneInfo(zone_name)
     now = datetime.now(zone)
@@ -97,13 +90,32 @@ def schedule_times(stories, zone_name):
     standalones = [story for story in stories if not story["is_chapter"]]
     if len(chapter) > 1:
         raise RuntimeError("Expected at most one Spare Key chapter in a daily batch")
+    if len(standalones) > len(STANDALONE_TIMES):
+        raise RuntimeError(
+            f"Daily batch contains {len(standalones)} standalone stories but only "
+            f"{len(STANDALONE_TIMES)} publishing slots are configured"
+        )
+
+    # Keep every successful build together on one publishing day. If the build
+    # finishes within 20 minutes of the first slot, move the whole batch to
+    # tomorrow rather than splitting it across two dates.
+    publish_date = now.date()
+    first_slot = datetime.combine(
+        publish_date, parse_clock(STANDALONE_TIMES[0]), tzinfo=zone
+    )
+    if now + timedelta(minutes=20) >= first_slot:
+        publish_date += timedelta(days=1)
+
     assigned = {}
     if chapter:
-        assigned[chapter[0]["id"]] = next_slot(CHAPTER_TIME, zone, now)
+        assigned[chapter[0]["id"]] = datetime.combine(
+            publish_date, parse_clock(CHAPTER_TIME), tzinfo=zone
+        )
     for index, story in enumerate(standalones):
-        clock = STANDALONE_TIMES[index % len(STANDALONE_TIMES)]
-        base = now + timedelta(days=index // len(STANDALONE_TIMES))
-        assigned[story["id"]] = next_slot(clock, zone, base)
+        assigned[story["id"]] = datetime.combine(
+            publish_date, parse_clock(STANDALONE_TIMES[index]), tzinfo=zone
+        )
+    print(f"Scheduling the complete batch for {publish_date} in {zone_name}")
     return assigned
 
 
